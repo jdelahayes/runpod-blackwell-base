@@ -47,6 +47,24 @@ docker login ghcr.io
 ./push.sh
 ```
 
+## CI (GitHub Actions)
+
+`.github/workflows/build-push.yml` build et pousse l'image sur GHCR (`ghcr.io`) à chaque
+push sur `main` qui touche le `Dockerfile`, ou manuellement via l'onglet Actions
+("Run workflow"). Aucun secret à configurer : l'action utilise le `GITHUB_TOKEN` fourni
+automatiquement par GitHub, avec la permission `packages: write`.
+
+Tags publiés : `ghcr.io/<owner>/runpod-blackwell-base:latest` et `:sha-<commit-court>`.
+
+**Étape unique après le tout premier push** : le package GHCR est privé par défaut. Va dans
+GitHub → onglet *Packages* du dépôt → *Package settings* → *Change visibility* → *Public*,
+sinon `runpodctl pod create` ne pourra pas puller l'image sans configurer un
+`--registry-auth-id`.
+
+Le workflow contient aussi un step optionnel (commenté) pour déclencher automatiquement un
+rebuild de `runpod-comfy-blackwell` dès que la base change, via `repository_dispatch` — voir
+les instructions dans le fichier YAML pour l'activer.
+
 ## Faire évoluer les versions
 
 Tout est paramétré en `ARG` en haut du `Dockerfile` (`PYTHON_VERSION`, `CUDA_DEVEL_IMAGE`,
