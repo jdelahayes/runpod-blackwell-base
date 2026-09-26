@@ -52,9 +52,16 @@ RUN uv pip install --no-cache-dir \
 
 # SageAttention : attention quantifiée FP8/INT8, gain ~2x sur Blackwell, recommandée
 # par ComfyUI pour MiniMax H3. Compilée uniquement pour sm_120 (TORCH_CUDA_ARCH_LIST).
+#
+# Le setup.py de thu-ml/SageAttention (branche main) code en dur "-std=c++17", incompatible
+# avec les headers PyTorch >= 2.14 qui exigent C++20 (cf. issue upstream #400 : pas encore
+# fusionné au moment d'écrire ce Dockerfile). On clone et on patche ce seul flag avant build,
+# plutôt que d'attendre le fix amont. À retirer si/quand thu-ml/SageAttention le corrige.
 RUN uv pip install --no-cache-dir packaging wheel setuptools \
-    && uv pip install --no-cache-dir --no-build-isolation \
-      "sageattention @ git+https://github.com/thu-ml/SageAttention.git@main"
+    && git clone --depth 1 https://github.com/thu-ml/SageAttention.git /tmp/sageattention \
+    && sed -i 's/-std=c++17/-std=c++20/g' /tmp/sageattention/setup.py \
+    && uv pip install --no-cache-dir --no-build-isolation /tmp/sageattention \
+    && rm -rf /tmp/sageattention
 
 # Nettoyage : caches, tests, binaires de debug — pur gain de taille, aucun impact runtime.
 RUN find /opt/venv -type d -name "__pycache__" -prune -exec rm -rf {} + \
