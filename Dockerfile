@@ -57,10 +57,16 @@ RUN uv pip install --no-cache-dir \
 # avec les headers PyTorch >= 2.14 qui exigent C++20 (cf. issue upstream #400 : pas encore
 # fusionné au moment d'écrire ce Dockerfile). On clone et on patche ce seul flag avant build,
 # plutôt que d'attendre le fix amont. À retirer si/quand thu-ml/SageAttention le corrige.
+#
+# MAX_JOBS=1 : les noyaux CUTLASS de SageAttention sont lourds à compiler (nvcc peut monter
+# à plusieurs Go de RAM par unité de compilation). En parallèle (ninja utilise nproc par
+# défaut, soit 4 sur les runners GitHub standard), ça dépasse la RAM disponible et le process
+# est tué en silence (aucune erreur explicite dans les logs, juste une disparition du build).
+# Compile plus lentement mais de façon fiable.
 RUN uv pip install --no-cache-dir packaging wheel setuptools \
     && git clone --depth 1 https://github.com/thu-ml/SageAttention.git /tmp/sageattention \
     && sed -i 's/-std=c++17/-std=c++20/g' /tmp/sageattention/setup.py \
-    && uv pip install --no-cache-dir --no-build-isolation /tmp/sageattention \
+    && MAX_JOBS=1 uv pip install --no-cache-dir --no-build-isolation /tmp/sageattention \
     && rm -rf /tmp/sageattention
 
 # Nettoyage : caches, tests, binaires de debug — pur gain de taille, aucun impact runtime.
