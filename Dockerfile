@@ -104,6 +104,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/*
 
 COPY --from=builder /opt/venv /opt/venv
+# uv (juste le binaire) : les images en aval (ex. runpod-comfy-blackwell) l'utilisent aussi
+# pour installer leurs propres dépendances, plus vite que pip.
+COPY --from=builder /root/.local/bin/uv /usr/local/bin/uv
 
 # Sanity check au build : echoue tot si le venv est casse, plutot qu'au demarrage du pod.
 RUN python -c "import torch; assert torch.__version__.startswith('${TORCH_VERSION}'.split('+')[0]); print('torch', torch.__version__, 'cuda available (attendu False sans GPU au build):', torch.cuda.is_available())"
