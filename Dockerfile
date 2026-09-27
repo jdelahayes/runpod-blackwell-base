@@ -29,7 +29,8 @@ ARG TORCH_CUDA_ARCH_LIST
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
+    TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST} \
+    UV_HTTP_TIMEOUT=180
 
 # Python 3.13 via deadsnakes (Ubuntu 24.04 ne fournit que 3.12 par défaut).
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -93,12 +94,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Même mineure Python que le builder (le venv référence l'interpréteur système),
 # + le strict nécessaire pour SSH (standard RunPod) et les libs graphiques (opencv, etc.).
+#
+# gcc + python3-dev : Triton (utilisé par ComfyUI/PyTorch pour certains kernels, ex. les
+# rotary embeddings des text encoders type Qwen3) compile ses propres noyaux CUDA À LA VOLÉE
+# (JIT) au premier usage, pas seulement au build de l'image — il lui faut donc un compilateur
+# C ET les headers Python (Python.h, via sysconfig) présents à l'exécution, pas juste dans le
+# stage builder. Sans ça : "Failed to find C compiler". gcc seul (pas tout build-essential)
+# suffit côté compilateur ; apt tire automatiquement libc6-dev/binutils avec.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       software-properties-common curl ca-certificates git openssh-server \
-      libgl1 libglib2.0-0 \
+      libgl1 libglib2.0-0 gcc \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
-      python${PYTHON_VERSION} python${PYTHON_VERSION}-venv \
+      python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python${PYTHON_VERSION}-dev \
     && apt-get purge -y software-properties-common \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/*
