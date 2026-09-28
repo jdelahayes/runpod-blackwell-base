@@ -90,7 +90,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PATH="/opt/venv/bin:${PATH}" \
     VIRTUAL_ENV=/opt/venv \
-    HF_HUB_ENABLE_HF_TRANSFER=1
+    HF_XET_HIGH_PERFORMANCE=1
 
 # Même mineure Python que le builder (le venv référence l'interpréteur système),
 # + le strict nécessaire pour SSH (standard RunPod) et les libs graphiques (opencv, etc.).
