@@ -8,21 +8,21 @@ socle réutilisable pour n'importe quelle appli (ComfyUI, un serveur d'inférenc
 
 | Composant | Version | Pourquoi |
 |---|---|---|
-| CUDA (build only) | 13.0.2 | Première ligne CUDA avec support natif sm_120 (Blackwell) et wheels ~33% plus légères que 12.8 |
-| PyTorch | 2.14.0 (cu130) | Dernière stable, combo validé avec ComfyUI v0.37.2 |
+| CUDA (build only) | 13.2.1 | Même mineure que les wheels PyTorch cu132 (nvcc = runtime pour SageAttention) ; CUDA 13 : support natif sm_120 (Blackwell) et wheels ~33% plus légères que 12.8 |
+| PyTorch | 2.14.0 (cu132) | Dernière stable, combo validé avec ComfyUI v0.37.2 |
 | Python | 3.13 | Version recommandée par ComfyUI actuellement |
 | SageAttention | main (thu-ml) | Attention quantifiée FP8/INT8, ~2x plus rapide sur Blackwell, requise/recommandée pour MiniMax H3 |
 | OS final | Ubuntu 24.04 nu (pas nvidia/cuda) | Voir "Pourquoi c'est léger" ci-dessous |
 
 ## Pourquoi c'est léger
 
-Le stage final ne part **pas** de `nvidia/cuda`. Les wheels PyTorch `cu130` embarquent déjà
+Le stage final ne part **pas** de `nvidia/cuda`. Les wheels PyTorch `cu132` embarquent déjà
 tout le runtime CUDA nécessaire (cuBLAS, cuDNN, NCCL, cuSPARSE...) sous forme de dépendances
 pip (`nvidia-*-cu13`). Le driver NVIDIA est fourni par l'hôte RunPod via le
 nvidia-container-toolkit — il ne fait jamais partie de l'image. Empiler `nvidia/cuda:*-runtime`
 + pip torch ferait donc doublonner plusieurs Go de bibliothèques CUDA pour rien.
 
-`nvidia/cuda:13.0.2-cudnn-devel` n'est utilisé que dans le **stage de build** (il faut `nvcc`
+`nvidia/cuda:13.2.1-cudnn-devel` n'est utilisé que dans le **stage de build** (il faut `nvcc`
 pour compiler SageAttention), puis jeté au multi-stage.
 
 Autres leviers de taille :
@@ -69,4 +69,4 @@ les instructions dans le fichier YAML pour l'activer.
 
 Tout est paramétré en `ARG` en haut du `Dockerfile` (`PYTHON_VERSION`, `CUDA_DEVEL_IMAGE`,
 `TORCH_VERSION`, `TORCH_CUDA_ARCH_LIST`). Pour bumper PyTorch : vérifier la disponibilité de
-la wheel sur https://download.pytorch.org/whl/cu130 avant de changer `TORCH_VERSION`.
+la wheel sur https://download.pytorch.org/whl/cu132 avant de changer `TORCH_VERSION`.

@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 IMAGE_NAME="${IMAGE_NAME:-runpod-blackwell-base}"
-IMAGE_TAG="${IMAGE_TAG:-cu130-torch2.14-py313}"
+IMAGE_TAG="${IMAGE_TAG:-cu132-torch2.14-py313}"
 REGISTRY="${REGISTRY:-}" # ex: ghcr.io/tonuser
 
 FULL_TAG="${IMAGE_NAME}:${IMAGE_TAG}"

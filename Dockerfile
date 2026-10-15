@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.7
 #
 # runpod-blackwell-base
-# Image de base minimale : Python + PyTorch (CUDA 13.0 / Blackwell sm_120) + SageAttention.
+# Image de base minimale : Python + PyTorch (CUDA 13.2 / Blackwell sm_120) + SageAttention.
 #
 # Choix clé pour la légèreté : le stage final PART D'UBUNTU NU, pas de nvidia/cuda.
-# Les wheels PyTorch cu130 embarquent déjà tout le runtime CUDA dont elles ont besoin
+# Les wheels PyTorch cu132 embarquent déjà tout le runtime CUDA dont elles ont besoin
 # (nvidia-cublas-cu13, nvidia-cudnn-cu13, nvidia-nccl-cu13, ...). Le driver NVIDIA, lui,
 # est fourni par l'hôte RunPod (nvidia-container-toolkit) : il ne fait jamais partie de
 # l'image. Partir de nvidia/cuda:*-runtime en plus de pip torch ferait doublonner ~3-4 Go
 # de bibliothèques CUDA pour rien. On ne touche à une image nvidia/cuda "devel" (avec nvcc)
 # que dans le stage de build, pour compiler SageAttention, puis on la jette.
 ARG PYTHON_VERSION=3.13
-ARG CUDA_DEVEL_IMAGE=nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
+ARG CUDA_DEVEL_IMAGE=nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
 ARG TORCH_VERSION=2.14.0
 # RTX PRO 6000 Blackwell = compute capability 12.0 (sm_120), comme les RTX 50 series.
 # On ne compile QUE pour cette architecture : build plus rapide, wheel plus petite,
@@ -46,10 +46,20 @@ ENV PATH="/root/.local/bin:${PATH}"
 RUN uv venv /opt/venv --python python${PYTHON_VERSION} --seed
 ENV PATH="/opt/venv/bin:${PATH}" VIRTUAL_ENV=/opt/venv
 
-# PyTorch stable, wheels CUDA 13.0 (natif Blackwell, ~33% plus légères que cu128).
+# PyTorch stable, wheels CUDA 13.2 (natif Blackwell, ~33% plus légères que cu128).
+# Même version de CUDA que nvcc dans CUDA_DEVEL_IMAGE : SageAttention est compilée et exécutée
+# avec la même mineure.
+#
+# torchaudio est en maintenance et figé en 2.11 : il n'est pas publié sur l'index cu132.
+# Une wheel CUDA d'une autre version (ex. cu130) refuse de s'importer (torchaudio exige la même
+# version CUDA que torch, "compiled with different CUDA versions"). On prend donc la wheel CPU :
+# ComfyUI n'utilise torchaudio que pour le chargement/rééchantillonnage audio, qui passe par des
+# ops torch (GPU possible) ; seuls les kernels CUDA propres à torchaudio (RNNT, CTC) manquent.
 RUN uv pip install --no-cache-dir \
-      torch==${TORCH_VERSION} torchvision torchaudio \
-      --index-url https://download.pytorch.org/whl/cu130
+      torch==${TORCH_VERSION} torchvision \
+      --index-url https://download.pytorch.org/whl/cu132 \
+    && uv pip install --no-cache-dir torchaudio \
+      --index-url https://download.pytorch.org/whl/cpu
 
 # SageAttention : attention quantifiée FP8/INT8, gain ~2x sur Blackwell, recommandée
 # par ComfyUI pour MiniMax H3. Compilée uniquement pour sm_120 (TORCH_CUDA_ARCH_LIST).
@@ -82,7 +92,7 @@ RUN find /opt/venv -type d -name "__pycache__" -prune -exec rm -rf {} + \
 FROM ubuntu:24.04 AS final
 ARG PYTHON_VERSION
 LABEL org.opencontainers.image.title="runpod-blackwell-base" \
-      org.opencontainers.image.description="CUDA 13.0 / PyTorch 2.14 (cu130) optimise pour RTX 6000 PRO (Blackwell, sm_120)"
+      org.opencontainers.image.description="CUDA 13.2 / PyTorch 2.14 (cu132) optimise pour RTX 6000 PRO (Blackwell, sm_120)"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -117,7 +127,7 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /root/.local/bin/uv /usr/local/bin/uv
 
 # Sanity check au build : echoue tot si le venv est casse, plutot qu'au demarrage du pod.
-RUN python -c "import torch; assert torch.__version__.startswith('${TORCH_VERSION}'.split('+')[0]); print('torch', torch.__version__, 'cuda available (attendu False sans GPU au build):', torch.cuda.is_available())"
+RUN python -c "import torch, torchvision, torchaudio; assert torch.__version__.startswith('${TORCH_VERSION}'.split('+')[0]); print('torch', torch.__version__, 'cuda available (attendu False sans GPU au build):', torch.cuda.is_available())"
 
 WORKDIR /workspace
 CMD ["/bin/bash"]
